@@ -53,37 +53,38 @@ def csv_helper(file_name: str) -> Iterator[Stock]:
 #config schema will take in one parameter, a string name s3_key. The output of the op is a list of Stock.
 #helper function provider csv_helper which takes in a file name and yields a generator of Stock using the class method for our custom data type.
 
-@op(config_schema={"s3_key": str}, out={"stocks": Out(dagster_type=List[Stock])})
+@op(description="Ingest data from S3", config_schema={"s3_key": str}, out={"stocks": Out(dagster_type=List[Stock])})
 def get_s3_data_op(context):
     return list(csv_helper(context.op_config["s3_key"]))
 
 #require the output of the get_s3_data (which will be a list of Stock). The output of the process_data will be our custom type Aggregation
 #processing occurring within the op will take the list of stocks and determine the Stock with the greatest high value. 
 
-@op(ins={"stocks": In(dagster_type=List[Stock])}, out={"high_stock": Out(dagster_type=List[Aggregation])})
-def process_data_op(stocks: list):
-    for stock in stocks:
-    #Aggregation(date=datetime(2022, 2, 1, 0, 0), high=15.0
-    return high_stock
+@op(description="Derive stock with greatest value.", ins={"stocks": In(dagster_type=List[Stock])}, out={"high_stock_data": Out(dagster_type=Aggregation)})
+def process_data_op(context, stocks: list):
+  high_stock = stocks[0].high       #set it to be the value from the first list
+  high_stock_date = stocks[0].date  #set it to be the value from the first list
+  for stock in stocks:
+    if stock.high >= high_stock:
+      high_stock = stock.high
+      high_stock_date = stock.date
+  return Aggregation(date= high_stock_date, high = high_stock)
 
 #need to accept the Aggregation type from your process_data
-@op(ins={"high_stock": In(dagster_type=Aggregation)})
-def put_redis_data_op(context, Aggregation):
+@op(description="Send data to Redis.", ins={"high_stock_data": In(dagster_type=Aggregation)})
+def put_redis_data_op(context, high_stock_data):
     pass
-
 
 #need to accept the Aggregation type from your process_data
-@op(ins={"high_stock": In(dagster_type=Aggregation)})
-def put_s3_data_op(context, Aggregation):
+@op(description="Send transformed data to S3.", ins={"high_stock_data": In(dagster_type=Aggregation)})
+def put_s3_data_op(context, high_stock_data):
     pass
 
-#You will be responsible for chaining the ops together so that they execute in the correct order and correctly pass their outputs.
+#chain the ops together so that they execute in the correct order and correctly pass their outputs.
 
 @job
 def machine_learning_job():
     a = get_s3_data_op()
-    b = process_data_op([a])
-    #c = put_redis_data_op([b])
-    #d = put_s3_data_op([b])    
-    
-    #job = process_data.to_job(config={"ops": {"get_s3_data_op": {"config": {"s3_key": "stock"}}}})
+    b = process_data_op(a)
+    c = put_redis_data_op(b)
+    d = put_s3_data_op(b)
