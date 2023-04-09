@@ -62,17 +62,19 @@ def get_s3_data_op(context):
 
 @op(ins={"stocks": In(dagster_type=List[Stock])}, out={"high_stock": Out(dagster_type=List[Aggregation])})
 def process_data_op(stocks: list):
+    for stock in stocks:
     #Aggregation(date=datetime(2022, 2, 1, 0, 0), high=15.0
     return high_stock
 
 #need to accept the Aggregation type from your process_data
-@op(ins={"high_stock": In(dagster_type=List[Aggregation])})
-def put_redis_data_op(high_stock):
+@op(ins={"high_stock": In(dagster_type=Aggregation)})
+def put_redis_data_op(context, Aggregation):
     pass
 
+
 #need to accept the Aggregation type from your process_data
-@op(ins={"high_stock": In(dagster_type=List[Aggregation])})
-def put_s3_data_op(high_stock):
+@op(ins={"high_stock": In(dagster_type=Aggregation)})
+def put_s3_data_op(context, Aggregation):
     pass
 
 #You will be responsible for chaining the ops together so that they execute in the correct order and correctly pass their outputs.
