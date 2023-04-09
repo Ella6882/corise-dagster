@@ -49,27 +49,39 @@ def csv_helper(file_name: str) -> Iterator[Stock]:
         for row in reader:
             yield Stock.from_list(row)
 
+#input will not be from another op but will be provided via the config_schema. 
+#config schema will take in one parameter, a string name s3_key. The output of the op is a list of Stock.
+#helper function provider csv_helper which takes in a file name and yields a generator of Stock using the class method for our custom data type.
 
-@op
-def get_s3_data_op():
+@op(config_schema={"s3_key": str}, out={"stocks": Out(dagster_type=List[Stock])})
+def get_s3_data_op(context):
+    return list(csv_helper(context.op_config["s3_key"]))
+
+#require the output of the get_s3_data (which will be a list of Stock). The output of the process_data will be our custom type Aggregation
+#processing occurring within the op will take the list of stocks and determine the Stock with the greatest high value. 
+
+@op(ins={"stocks": In(dagster_type=List[Stock])}, out={"high_stock": Out(dagster_type=List[Aggregation])})
+def process_data_op(stocks: list):
+    #Aggregation(date=datetime(2022, 2, 1, 0, 0), high=15.0
+    return high_stock
+
+#need to accept the Aggregation type from your process_data
+@op(ins={"high_stock": In(dagster_type=List[Aggregation])})
+def put_redis_data_op(high_stock):
     pass
 
-
-@op
-def process_data_op():
+#need to accept the Aggregation type from your process_data
+@op(ins={"high_stock": In(dagster_type=List[Aggregation])})
+def put_s3_data_op(high_stock):
     pass
 
-
-@op
-def put_redis_data_op():
-    pass
-
-
-@op
-def put_s3_data_op():
-    pass
-
+#You will be responsible for chaining the ops together so that they execute in the correct order and correctly pass their outputs.
 
 @job
 def machine_learning_job():
-    pass
+    a = get_s3_data_op()
+    b = process_data_op([a])
+    #c = put_redis_data_op([b])
+    #d = put_s3_data_op([b])    
+    
+    #job = process_data.to_job(config={"ops": {"get_s3_data_op": {"config": {"s3_key": "stock"}}}})
